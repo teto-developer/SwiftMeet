@@ -1,7 +1,6 @@
 const { RtcTokenBuilder, RtcRole } = require("agora-access-token");
 const admin = require("firebase-admin");
 
-// Firebase初期化（重複防止）
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
@@ -16,36 +15,31 @@ const db = admin.firestore();
 
 exports.handler = async (event) => {
   try {
-    if (event.httpMethod !== "POST") {
-      return { statusCode: 405, body: "Method Not Allowed" };
-    }
 
-    const { room } = JSON.parse(event.body);
+    const { room, password } = JSON.parse(event.body);
 
-    if (!room) {
+    if (!room || !password) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: "Room required" }),
+        body: JSON.stringify({ error: "Room and password required" })
       };
     }
 
-    // 🔑 ランダムルームキー生成
-    const roomKey = Math.random().toString(36).substring(2, 8);
+    const roomKey = password; // ← ここがパスワード
 
-    // 🔥 Firestoreに保存
+    // Firestore保存
     await db.collection("rooms").doc(room).set({
       roomKey,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
-    // 🎥 Agoraトークン生成（ホスト用）
+    // Agora token
     const appID = process.env.AGORA_APP_ID;
     const appCertificate = process.env.AGORA_APP_CERT;
 
     const uid = Math.floor(Math.random() * 100000);
     const expireTime = 3600;
     const currentTime = Math.floor(Date.now() / 1000);
-    const privilegeExpireTime = currentTime + expireTime;
 
     const token = RtcTokenBuilder.buildTokenWithUid(
       appID,
@@ -53,22 +47,22 @@ exports.handler = async (event) => {
       room,
       uid,
       RtcRole.PUBLISHER,
-      privilegeExpireTime
+      currentTime + expireTime
     );
 
     return {
       statusCode: 200,
       body: JSON.stringify({
         room,
-        roomKey,
         token,
-        uid,
-      }),
+        uid
+      })
     };
+
   } catch (err) {
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: err.message }),
+      body: JSON.stringify({ error: err.message })
     };
   }
 };
