@@ -15,16 +15,17 @@ const db = admin.firestore();
 
 exports.handler = async (event) => {
   try {
+
     if (event.httpMethod !== "POST") {
       return { statusCode: 405, body: "Method Not Allowed" };
     }
 
-    const { room, roomKey } = JSON.parse(event.body);
+    const { room, password } = JSON.parse(event.body);
 
-    if (!room || !roomKey) {
+    if (!room || !password) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: "Room and key required" }),
+        body: JSON.stringify({ error: "Room and password required" })
       };
     }
 
@@ -33,27 +34,27 @@ exports.handler = async (event) => {
     if (!doc.exists) {
       return {
         statusCode: 404,
-        body: JSON.stringify({ error: "Room not found" }),
+        body: JSON.stringify({ error: "Room not found" })
       };
     }
 
     const data = doc.data();
 
-    if (data.roomKey !== roomKey) {
+    // パスワード照合
+    if (data.roomKey !== password) {
       return {
         statusCode: 403,
-        body: JSON.stringify({ error: "Invalid room key" }),
+        body: JSON.stringify({ error: "Wrong password" })
       };
     }
 
-    // 🎥 視聴者トークン発行
+    // Agora token生成（参加者用）
     const appID = process.env.AGORA_APP_ID;
     const appCertificate = process.env.AGORA_APP_CERT;
 
     const uid = Math.floor(Math.random() * 100000);
     const expireTime = 3600;
     const currentTime = Math.floor(Date.now() / 1000);
-    const privilegeExpireTime = currentTime + expireTime;
 
     const token = RtcTokenBuilder.buildTokenWithUid(
       appID,
@@ -61,18 +62,21 @@ exports.handler = async (event) => {
       room,
       uid,
       RtcRole.SUBSCRIBER,
-      privilegeExpireTime
+      currentTime + expireTime
     );
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ token, uid }),
+      body: JSON.stringify({
+        token,
+        uid
+      })
     };
 
   } catch (err) {
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: err.message }),
+      body: JSON.stringify({ error: err.message })
     };
   }
 };
