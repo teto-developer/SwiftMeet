@@ -6,8 +6,8 @@ if (!admin.apps.length) {
     credential: admin.credential.cert({
       projectId: process.env.FIREBASE_PROJECT_ID,
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-    }),
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n")
+    })
   });
 }
 
@@ -16,18 +16,7 @@ const db = admin.firestore();
 exports.handler = async (event) => {
   try {
 
-    if (event.httpMethod !== "POST") {
-      return { statusCode: 405, body: "Method Not Allowed" };
-    }
-
     const { room, password } = JSON.parse(event.body);
-
-    if (!room || !password) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: "Room and password required" })
-      };
-    }
 
     const doc = await db.collection("rooms").doc(room).get();
 
@@ -40,7 +29,6 @@ exports.handler = async (event) => {
 
     const data = doc.data();
 
-    // パスワード照合
     if (data.roomKey !== password) {
       return {
         statusCode: 403,
@@ -48,21 +36,15 @@ exports.handler = async (event) => {
       };
     }
 
-    // Agora token生成（参加者用）
-    const appID = process.env.AGORA_APP_ID;
-    const appCertificate = process.env.AGORA_APP_CERT;
-
     const uid = Math.floor(Math.random() * 100000);
-    const expireTime = 3600;
-    const currentTime = Math.floor(Date.now() / 1000);
 
     const token = RtcTokenBuilder.buildTokenWithUid(
-      appID,
-      appCertificate,
+      process.env.AGORA_APP_ID,
+      process.env.AGORA_APP_CERT,
       room,
       uid,
       RtcRole.SUBSCRIBER,
-      currentTime + expireTime
+      Math.floor(Date.now() / 1000) + 3600
     );
 
     return {
