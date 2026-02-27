@@ -6,8 +6,8 @@ if (!admin.apps.length) {
     credential: admin.credential.cert({
       projectId: process.env.FIREBASE_PROJECT_ID,
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-    }),
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n")
+    })
   });
 }
 
@@ -25,30 +25,22 @@ exports.handler = async (event) => {
       };
     }
 
-    const roomKey = password; // ← ここがパスワード
-
-    // Firestore保存
-    await db.collection("rooms").doc(room).set({
-      roomKey,
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-
-    // Agora token
-    const appID = process.env.AGORA_APP_ID;
-    const appCertificate = process.env.AGORA_APP_CERT;
-
     const uid = Math.floor(Math.random() * 100000);
-    const expireTime = 3600;
-    const currentTime = Math.floor(Date.now() / 1000);
 
+    const currentTime = Math.floor(Date.now() / 1000);
     const token = RtcTokenBuilder.buildTokenWithUid(
-      appID,
-      appCertificate,
+      process.env.AGORA_APP_ID,
+      process.env.AGORA_APP_CERT,
       room,
       uid,
       RtcRole.PUBLISHER,
-      currentTime + expireTime
+      currentTime + 3600
     );
+
+    await db.collection("rooms").doc(room).set({
+      roomKey: password,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
 
     return {
       statusCode: 200,
